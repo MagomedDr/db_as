@@ -1,8 +1,8 @@
 import psycopg2
 import os
-#import paramiko
+import paramiko
 import matplotlib.pyplot as plt
-from datetime import datetime
+from prettytable import PrettyTable
 import io
 from dotenv import load_dotenv
 load_dotenv()
@@ -11,6 +11,7 @@ load_dotenv()
 #############################################
 #              check_activity               #
 #############################################
+
 async def get_database_activity():
     try:
         conn = psycopg2.connect(
@@ -21,11 +22,32 @@ async def get_database_activity():
             password=os.environ.get("DB_PASSWORD")
         )
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM pg_stat_activity')
+        cursor.execute('''
+            SELECT datname, usename, state
+            FROM pg_stat_activity
+            ORDER BY query_start DESC
+            LIMIT 10
+        ''')
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        return result
+        
+        headers = [desc[0] for desc in cursor.description]
+        column_widths = [max(len(header), max(len(str(row[i])) for row in result)) for i, header in enumerate(headers)]
+
+        table = "<code>"
+        for i, header in enumerate(headers):
+            table += f"<b>{header.ljust(column_widths[i])}</b> "
+        table += "\n" + "-"*sum(column_widths) + "\n"
+
+        for row in result:
+            for i, value in enumerate(row):
+                table += str(value).ljust(column_widths[i]) + " "
+            table += "\n"
+
+        table += "</code>"
+
+        return table
     except psycopg2.Error as e:
         return None    
 
@@ -33,27 +55,7 @@ async def get_database_activity():
 #              check_info                   #
 #############################################
 
-
-# async def check_disk_and_cpu_use():
-#     ssh_client = paramiko.SSHClient()
-#     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#     ssh_client.connect(
-#         os.environ.get(""), 
-#         username=os.environ.get(""),
-#         password=os.environ.get(""))
-    
-#     command = "df -h"
-#     stdin, stdout, stderr = ssh_client.exec_command(command)
-
-#     output = stdout.read().decode('utf-8')
-#     print('#########################')
-#     print(output)
-#     print('#########################')
-#     ssh_client.close()
-#     return output
-
-
-async def get_database_and_system_info():
+async def get_system_info():
     try:
         conn = psycopg2.connect(
             host=os.environ.get("DB_HOST"),
@@ -79,18 +81,10 @@ async def get_database_and_system_info():
         cursor.close()
         conn.close()
 
-        # места на диске
-        #free_disk_space = await check_disk_and_cpu_use()
-
-        # # загруженность
-        # cpu_usage = psutil.cpu_percent(interval=1)
-
         return {
             'longest_transaction': longest_transaction_duration,
             'active_sessions': active_sessions,
             'sessions_lwlock': sessions_with_lwlock,
-            #'free_disk': free_disk_space,
-            #'cpu_use': cpu_usage
         }
     except psycopg2.Error as e:
         return None
@@ -110,3 +104,34 @@ async def send_photo(chat_id, x_keys, y):
 
     from main import bot
     await bot.send_photo(chat_id, photo=buf)
+
+
+
+#############################################
+#               settings                    #
+#############################################
+
+async def restart_postgresql():
+    try:
+        ssh_host = os.environ.get("DB_HOST")
+        ssh_port = 22
+        ssh_username = os.environ.get("SSH_USERNAME")
+        ssh_password = os.environ.get("SSH_PASSWORD")
+
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(ssh_host, ssh_port, ssh_username, ssh_password)
+
+        restart_command = "sudo service postgresql restart"
+
+        stdin, stdout, stderr = ssh_client.exec_command(restart_command)
+        exit_code = stdout.channel.recv_exit_status()
+
+        ssh_client.close()
+
+        if exit_code == 0:
+            return True 
+        else:
+            return False #("Произошла ошибка при попытке перезапуска PostgreSQL на удаленном сервере.")
+    except Exception as e:
+       return None
