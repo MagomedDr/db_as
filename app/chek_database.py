@@ -2,6 +2,7 @@ import psycopg2
 import os
 #import paramiko
 import matplotlib.pyplot as plt
+from datetime import datetime
 import io
 from dotenv import load_dotenv
 load_dotenv()
@@ -31,7 +32,6 @@ async def get_database_activity():
 #############################################
 #              check_info                   #
 #############################################
-
 
 
 # async def check_disk_and_cpu_use():
@@ -99,13 +99,14 @@ async def get_database_and_system_info():
 async def send_photo(chat_id, x_keys, y):
     plt.figure(figsize=(8, 6))
     plt.title("Параметры")
-    plt.xlabel('Parameter')
-    plt.ylabel("Значение")
-    data = [str(i) for i in y]
-    plt.plot(x_keys, data, marker='o')
+    y[0] = y[0].total_seconds()
+    data = [int(i) for i in y]
+    plt.bar(x_keys, data)
+    plt.ylabel('Значение')
 
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
+
     from main import bot
     await bot.send_photo(chat_id, photo=buf)
