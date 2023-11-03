@@ -1,6 +1,8 @@
 import psycopg2
 import os
-import paramiko
+#import paramiko
+import matplotlib.pyplot as plt
+import io
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -24,8 +26,7 @@ async def get_database_activity():
         conn.close()
         return result
     except psycopg2.Error as e:
-        return None
-    
+        return None    
 
 #############################################
 #              check_info                   #
@@ -93,3 +94,18 @@ async def get_database_and_system_info():
         }
     except psycopg2.Error as e:
         return None
+    
+
+async def send_photo(chat_id, x_keys, y):
+    plt.figure(figsize=(8, 6))
+    plt.title("Параметры")
+    plt.xlabel('Parameter')
+    plt.ylabel("Значение")
+    data = [str(i) for i in y]
+    plt.plot(x_keys, data, marker='o')
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    from main import bot
+    await bot.send_photo(chat_id, photo=buf)

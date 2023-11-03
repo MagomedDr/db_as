@@ -3,7 +3,7 @@ import aiogram
 import psycopg2
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
-from chek_database import get_database_activity, get_database_and_system_info
+from chek_database import get_database_activity, get_database_and_system_info, send_photo
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -59,7 +59,7 @@ async def check_activity(message: types.Message):
     if activity_data:
         response = "Состояние базы данных:\n"
         for row in activity_data:
-            response += f"Process ID: {row[0]}, Query: {row[6]}\n"
+            response += f"Процесс: {row[0]}, Query: {row[6]}\n"
         await message.answer(response)
     else:
         await message.answer("Не удалось получить данные о состоянии базы данных.")
@@ -71,21 +71,13 @@ async def check_activity(message: types.Message):
 
 @dp.message_handler(commands=['check_info'])
 async def check_info(message: types.Message):
-    info = await get_database_and_system_info()
-    if info:
-        response = (
-            f"Продолжительность самой долгой транзакции: {info['longest_transaction']}\n"
-            f"Количество активных сессий: {info['active_sessions']}\n"
-            f"Количество сессий со значением LWLock в колонке wait_event: {info['sessions_lwlock']}\n"
-            #f"Объем свободного места на диске: {info['free_disk']} байт\n"
-            #f"Загруженность процессора: {info['cpu_use']}%"
-        )
-        await message.answer(response)
+    data = await get_database_and_system_info()
+    if data:
+        x_keys = list(data.keys())
+        y = [data[key] for key in x_keys]
+        await send_photo(message.chat.id, x_keys, y)
     else:
         await message.answer("Не удалось получить информацию о состоянии базы данных и системных параметрах.")
-
-
-
 
 
 if __name__ == '__main__':
