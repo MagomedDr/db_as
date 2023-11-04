@@ -50,6 +50,17 @@ async def database_monitoring():
 
 
 #############################################
+#                   start                   #
+#############################################
+
+@dp.message_handler(commands=['start'])
+async def start_handler(message: types.Message):
+    if str(message.from_user.id) == os.environ.get('ADMIN_ID'):
+        await message.answer('Список команд:\n\n/check_activity\n\n/check_info\n\nНастройки: /settings')
+
+
+
+#############################################
 #              check_activity               #
 #############################################
 
@@ -120,18 +131,15 @@ async def send_sql(message: types.Message):
         )
 
         cursor = conn.cursor()
-
-        # Выполнение SQL запроса
+    
         cursor.execute(message.text)
         result = cursor.fetchall()
 
-        # Закрытие соединений
         cursor.close()
         conn.close()
 
-        # Отправка результата пользователю
         if result:
-            await message.answer("Результат выполнения SQL запроса:\n" + str(result))
+            await message.answer("Результат выполнения SQL запроса:\n" + str(*result[0]))
         else:
             await message.answer("SQL запрос выполнен успешно.")
     except Exception as e:
